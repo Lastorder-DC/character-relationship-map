@@ -771,12 +771,10 @@
         function handleDeleteNode(idToDelete) {
             const deletedNode = nodes.find(n => n.id === idToDelete);
             if (!deletedNode) return;
-            
-            // --- MODIFICATION: Removed confirm() ---
-            // confirm()은 iframe 환경에서 작동하지 않으므로 바로 삭제 실행
-            // if (!confirm(`"${deletedNode.name}" 캐릭터를 삭제하시겠습니까? 연결된 모든 관계선도 함께 삭제됩니다.`)) {
-            //     return;
-            // }
+
+            if (!confirm(`"${deletedNode.name}" 캐릭터를 삭제하시겠습니까? 연결된 모든 관계선도 함께 삭제됩니다.`)) {
+                return;
+            }
 
             nodes = nodes.filter(n => n.id !== idToDelete);
             lines = lines.filter(line => line.from !== idToDelete && line.to !== idToDelete);
@@ -797,11 +795,9 @@
             const deletedItem = legend[indexToDelete];
             if (!deletedItem) return;
 
-            // --- MODIFICATION: Removed confirm() ---
-            // confirm()은 iframe 환경에서 작동하지 않으므로 바로 삭제 실행
-            // if (!confirm(`"${deletedItem.text}" 관계를 삭제하시겠습니까? 이 관계를 사용하는 모든 선이 삭제됩니다.`)) {
-            //     return;
-            // }
+            if (!confirm(`"${deletedItem.text}" 관계를 삭제하시겠습니까? 이 관계를 사용하는 모든 선이 삭제됩니다.`)) {
+                return;
+            }
             
             legend.splice(indexToDelete, 1);
             lines = lines.filter(line => !(line.label === deletedItem.text && line.color === deletedItem.color));
@@ -878,9 +874,7 @@
 
         // 전체 초기화
         function clearAll() {
-            // --- MODIFICATION: Removed confirm() ---
-            // confirm()은 iframe 환경에서 작동하지 않으므로 바로 실행
-            // if (confirm('정말 모든 작업을 초기화하시겠습니까?')) {
+            if (confirm('정말 모든 작업을 초기화하시겠습니까?')) {
                 nodes = [];
                 lines = [];
                 legend = [...defaultLegend]; // --- MODIFICATION: Reset to default legend ---
@@ -894,7 +888,7 @@
                 updateCharacterDisplay(); // --- NEW ---
                 draw();
                 statusArea.textContent = '모든 내용이 초기화되었습니다.';
-            // }
+            }
             // --- END MODIFICATION ---
         }
 
