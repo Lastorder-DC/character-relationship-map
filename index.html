@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>캐릭터 관계도 생성기</title>
+    <!-- Tailwind CSS 로드 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter 폰트 로드 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', 'Noto Sans KR', sans-serif;
+            overflow: hidden; /* 스크롤 방지 */
+        }
+        /* 커스텀 스크롤바 (사이드바용) */
+        #sidebar {
+            scrollbar-width: thin;
+            scrollbar-color: #cbd5e1 #f1f5f9;
+        }
+        #sidebar::-webkit-scrollbar {
+            width: 8px;
+        }
+        #sidebar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 10px;
+        }
+        #sidebar::-webkit-scrollbar-thumb {
+            background-color: #cbd5e1;
+            border-radius: 10px;
+            border: 2px solid #f1f5f9;
+        }
+        /* 선택된 관계 항목 스타일 */
+        .legend-item.active {
+            box-shadow: 0 0 0 3px #3b82f6; /* 파란색 테두리 */
+            background-color: #eff6ff; /* 연한 파란색 배경 */
+        }
+    </style>
+</head>
+<body class="flex h-screen bg-gray-100 text-gray-800">
+
+    <!-- 모달 (캐릭터 추가용) -->
+    <div id="nodeModal" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden items-center justify-center">
+        <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
+            <h3 class="text-xl font-semibold mb-4">새 캐릭터 추가</h3>
+            <div class="space-y-4">
+                <div>
+                    <label for="nodeNameInput" class="block text-sm font-medium text-gray-700">캐릭터 이름</label>
+                    <input type="text" id="nodeNameInput" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="이름 입력...">
+                </div>
+                <div>
+                    <label for="nodeImageInput" class="block text-sm font-medium text-gray-700">캐릭터 이미지 (선택)</label>
+                    <input type="file" id="nodeImageInput" accept="image/*" class="mt-1 block w-full text-sm text-gray-500
+                        file:mr-4 file:py-2 file:px-4
+                        file:rounded-full file:border-0
+                        file:text-sm file:font-semibold
+                        file:bg-blue-50 file:text-blue-700
+                        hover:file:bg-blue-100">
+                    <p class="text-xs text-gray-500 mt-1">이미지 미선택 시 단색원으로 표시됩니다.</p>
+                </div>
+                <div>
+                    <label for="nodeColorInput" class="block text-sm font-medium text-gray-700">단색원 색상 (이미지 미선택 시)</label>
+                    <input type="color" id="nodeColorInput" value="#cbd5e1" class="mt-1 block w-full h-10 border-gray-300 rounded-md">
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end space-x-3">
+                <button id="cancelAddNode" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400">
+                    취소
+                </button>
+                <button id="confirmAddNode" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    추가하기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 사이드바 (컨트롤 패널) -->
+    <div id="sidebar" class="w-80 h-full bg-white shadow-lg flex flex-col p-5 overflow-y-auto">
+        <h1 class="text-2xl font-bold text-blue-600 mb-6">관계도 생성기</h1>
+
+        <!-- 관계 정의 (Legend) -->
+        <div class="mb-6">
+            <h2 class="text-lg font-semibold mb-3 border-b pb-2">관계 정의</h2>
+            <div class="space-y-3">
+                <input type="text" id="legendText" class="w-full px-3 py-2 border border-gray-300 rounded-md" placeholder="관계 이름 (예: 친구)">
+                <input type="color" id="legendColor" value="#ff0000" class="w-full h-10 border-gray-300 rounded-md">
+                <button id="addLegendBtn" class="w-full py-2 px-4 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors">
+                    관계 추가
+                </button>
+            </div>
+            <div id="legendDisplay" class="mt-4 space-y-2">
+                <!-- 동적으로 관계 항목 추가됨 -->
+                <p class="text-sm text-gray-500">정의된 관계가 없습니다.</p>
+            </div>
+        </div>
+
+        <!-- 캐릭터 추가 -->
+        <div class="mb-6">
+            <h2 class="text-lg font-semibold mb-3 border-b pb-2">캐릭터</h2>
+            <button id="addNodeBtn" class="w-full py-2 px-4 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors">
+                새 캐릭터 추가
+            </button>
+            <!-- --- NEW CHARACTER LIST DISPLAY --- -->
+            <div id="characterDisplay" class="mt-4 space-y-2">
+                <p class="text-sm text-gray-500">추가된 캐릭터가 없습니다.</p>
+            </div>
+            <!-- --- END NEW --- -->
+        </div>
+
+        <!-- 도구 -->
+        <div class="mb-6">
+            <h2 class="text-lg font-semibold mb-3 border-b pb-2">도구</h2>
+            <div class="space-y-3">
+                <button id="arrangeCircleBtn" class="w-full py-2 px-4 bg-purple-500 text-white rounded-md hover:bg-purple-600 transition-colors">
+                    원형으로 정렬
+                </button>
+                <button id="exportBtn" class="w-full py-2 px-4 bg-indigo-500 text-white rounded-md hover:bg-indigo-600 transition-colors">
+                    PNG로 저장
+                </button>
+                <button id="clearBtn" class="w-full py-2 px-4 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">
+                    전체 초기화
+                </button>
+            </div>
+        </div>
+        
+        <!-- 상태 안내 -->
+        <div class="mt-auto pt-4 border-t">
+            <h3 class="font-semibold">안내</h3>
+            <p id="statusArea" class="text-sm text-gray-600 leading-relaxed">
+                '관계 추가'로 관계를 정의하고 '새 캐릭터 추가'로 캐릭터를 만드세요.<br>
+                관계를 그리려면: [정의된 관계] 클릭 → [캐릭터 1] 클릭 → [캐릭터 2] 클릭
+            </p>
+        </div>
+    </div>
+
+    <!-- 메인 컨텐츠 (캔버스) -->
+    <div class="flex-grow p-5 h-full">
+        <canvas id="mainCanvas" class="w-full h-full bg-white rounded-lg shadow-inner border border-gray-200">
+            캔버스를 지원하지 않는 브라우저입니다.
+        </canvas>
+    </div>
+
+    <script type="module">
+        // --- 전역 변수 및 상태 ---
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // UI 요소
+        const addLegendBtn = document.getElementById('addLegendBtn');
+        const legendText = document.getElementById('legendText');
+        const legendColor = document.getElementById('legendColor');
+        const legendDisplay = document.getElementById('legendDisplay');
+        const characterDisplay = document.getElementById('characterDisplay'); // --- NEW ---
+        
+        const addNodeBtn = document.getElementById('addNodeBtn');
+        const nodeModal = document.getElementById('nodeModal');
+        const cancelAddNode = document.getElementById('cancelAddNode');
+        const confirmAddNode = document.getElementById('confirmAddNode');
+        const nodeNameInput = document.getElementById('nodeNameInput');
+        const nodeImageInput = document.getElementById('nodeImageInput');
+        const nodeColorInput = document.getElementById('nodeColorInput');
+
+        const exportBtn = document.getElementById('exportBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const arrangeCircleBtn = document.getElementById('arrangeCircleBtn'); //
+        const statusArea = document.getElementById('statusArea');
+
+        // 데이터 상태
+        let nodes = []; // { id, x, y, radius, name, color, image? }
+        let lines = []; // { from, to, color, label }
+        
+        // --- MODIFICATION: Default legend setup ---
+        const defaultLegend = [
+            { text: '사랑 중 ♥', color: '#F87171' }, // red-400
+            { text: '신뢰 / 사이 좋음', color: '#93C5FD' }, // blue-300
+            { text: '평범하게 아는 사이', color: '#A7F3D0' }, // emerald-200
+            { text: '친구 ~ 지인', color: '#FEF08A' }, // yellow-200
+            { text: '사이 안 좋음', color: '#E9D5FF' }, // purple-200
+            { text: '사이 나쁨 ~ 앙숙', color: '#737373' }  // neutral-500
+        ];
+        let legend = [...defaultLegend]; // Initialize with a copy
+        // --- MODIFICATION END ---
+
+        // 상호작용 상태
+        let selectedColor = '#000000';
+        let selectedLabel = '';
+        let selectedLegendEl = null;
+        let selection = null; // 첫 번째 선택된 노드 ID
+        let isDragging = false;
+        let draggingNode = null;
+        let highlightedNodeId = null; // 
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let lastNodeId = 0; // 간단한 ID 부여용
+
+        // --- 초기화 ---
+        function initialize() {
+            resizeCanvas();
+            updateLegendDisplay();
+            updateCharacterDisplay(); // --- NEW ---
+            draw();
+            setupEventListeners();
+        }
+
+        function resizeCanvas() {
+            // 캔버스의 실제 픽셀 크기를 CSS 크기와 맞춤 (HiDPI 대응)
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            draw(); // 리사이즈 후 다시 그리기
+        }
+
+        // --- 그리기 함수 ---
+        function draw() {
+            const rect = canvas.getBoundingClientRect();
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, rect.width, rect.height);
+            ctx.font = '14px Inter';
+            ctx.textAlign = 'left';
+
+            // 1. 선 그리기
+            ctx.lineCap = 'round';
+            lines.forEach(line => {
+                // --- NEW LOGIC START ---
+                // 하이라이트 모드일 때 필터링
+                if (highlightedNodeId !== null && line.from !== highlightedNodeId && line.to !== highlightedNodeId) {
+                    return; // 이 선은 그리지 않음
+                }
+                // --- NEW LOGIC END ---
+
+                const fromNode = nodes.find(n => n.id === line.from);
+                const toNode = nodes.find(n => n.id === line.to);
+                if (!fromNode || !toNode) return;
+
+                ctx.beginPath();
+                ctx.moveTo(fromNode.x, fromNode.y);
+                ctx.lineTo(toNode.x, toNode.y);
+                ctx.strokeStyle = line.color;
+                ctx.lineWidth = 4;
+                ctx.stroke();
+
+                // 선 위에 레이블 텍스트 그리기
+                const midX = (fromNode.x + toNode.x) / 2;
+                const midY = (fromNode.y + toNode.y) / 2;
+                const angle = Math.atan2(toNode.y - fromNode.y, toNode.x - fromNode.x);
+
+                // 텍스트 배경을 위한 사각형
+                const textMetrics = ctx.measureText(line.label);
+                const textWidth = textMetrics.width + 10;
+                const textHeight = 18;
+
+                ctx.save();
+                ctx.translate(midX, midY);
+                ctx.rotate(angle);
+                
+                ctx.fillStyle = 'white'; // 텍스트 배경색
+                ctx.fillRect(-textWidth / 2, -textHeight / 2 - 2, textWidth, textHeight);
+                
+                ctx.fillStyle = line.color; // 텍스트 색상
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.font = 'bold 12px Inter';
+                ctx.fillText(line.label, 0, 0);
+                
+                ctx.restore();
+            });
+
+            // --- NEW: Identify related nodes if in highlight mode ---
+            let relatedNodeIds = new Set();
+            if (highlightedNodeId !== null) {
+                relatedNodeIds.add(highlightedNodeId); // The node itself
+                lines.forEach(line => {
+                    if (line.from === highlightedNodeId) relatedNodeIds.add(line.to);
+                    if (line.to === highlightedNodeId) relatedNodeIds.add(line.from);
+                });
+            }
+            // --- END NEW ---
+
+            // 2. 노드(캐릭터) 그리기
+            nodes.forEach(node => {
+                // --- NEW: Dimming logic ---
+                let isDimmed = false;
+                if (highlightedNodeId !== null && !relatedNodeIds.has(node.id)) {
+                    isDimmed = true;
+                }
+                ctx.save(); // Save before applying opacity
+                if (isDimmed) {
+                    ctx.globalAlpha = 0.2; // Dim unrelated nodes
+                }
+                // --- END NEW ---
+
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+
+                ctx.save();
+                if (node.image) {
+                    // 이미지 그리기 (원형으로 클리핑)
+                    ctx.clip();
+                    try {
+                        ctx.drawImage(node.image, node.x - node.radius, node.y - node.radius, node.radius * 2, node.radius * 2);
+                    } catch (e) {
+                        // 이미지 로딩 오류 시 대체 색상
+                        console.error("Image drawing error:", e);
+                        ctx.fillStyle = node.color;
+                        ctx.fill();
+                    }
+                } else {
+                    // 단색원 그리기
+                    ctx.fillStyle = node.color;
+                    ctx.fill();
+                }
+                ctx.restore();
+
+                // 테두리 그리기
+                ctx.strokeStyle = '#222';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // 이름 텍스트 그리기 (텍스트 배경 포함)
+                ctx.textAlign = 'center';
+                ctx.font = '14px Inter';
+                const textY = node.y + node.radius + 15;
+                const textMetrics = ctx.measureText(node.name);
+                const textWidth = textMetrics.width + 10;
+                
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'; // 반투명 흰색 배경
+                ctx.fillRect(node.x - textWidth / 2, textY - 12, textWidth, 18);
+                
+                ctx.fillStyle = 'black'; // 텍스트 색상
+                ctx.fillText(node.name, node.x, textY);
+
+                ctx.restore(); // --- NEW: Restore from opacity ---
+            });
+
+            // 3. 선택 하이라이트 그리기 (for line drawing)
+            if (selection) { // 
+                const node = nodes.find(n => n.id === selection); // 
+                if (node) {
+                    ctx.beginPath();
+                    ctx.arc(node.x, node.y, node.radius + 5, 0, Math.PI * 2);
+                    ctx.strokeStyle = '#3b82f6'; // 파란색
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                }
+            }
+
+            // --- NEW: 4. 하이라이트된 노드 표시 (for viewing) ---
+            if (highlightedNodeId !== null && !selection) { // selection(line drawing)이 우선
+                const node = nodes.find(n => n.id === highlightedNodeId);
+                if (node) {
+                    ctx.beginPath();
+                    ctx.arc(node.x, node.y, node.radius + 5, 0, Math.PI * 2);
+                    ctx.strokeStyle = '#f59e0b'; // 주황색
+                    ctx.lineWidth = 4;
+                    ctx.setLineDash([5, 5]); // 점선
+                    ctx.stroke();
+                    ctx.setLineDash([]); // 점선 해제
+                }
+            }
+        }
+
+        // --- 이벤트 리스너 설정 ---
+        function setupEventListeners() {
+            window.addEventListener('resize', () => {
+                resizeCanvas();
+                draw();
+            });
+
+            // 캔버스 이벤트
+            canvas.addEventListener('mousedown', onMouseDown);
+            canvas.addEventListener('mousemove', onMouseMove);
+            canvas.addEventListener('mouseup', onMouseUp);
+            canvas.addEventListener('mouseout', onMouseOut);
+
+            // 사이드바 버튼
+            addLegendBtn.addEventListener('click', handleAddLegend);
+            addNodeBtn.addEventListener('click', () => nodeModal.classList.remove('hidden'));
+            exportBtn.addEventListener('click', exportAsPNG);
+            clearBtn.addEventListener('click', clearAll);
+            arrangeCircleBtn.addEventListener('click', arrangeInCircle); 
+
+            // 모달 버튼
+            cancelAddNode.addEventListener('click', () => {
+                nodeModal.classList.add('hidden');
+                resetNodeModal();
+            });
+            confirmAddNode.addEventListener('click', handleAddNode);
+        }
+
+        // --- 핸들러 함수 ---
+
+        // --- NEW FUNCTION ---
+        function arrangeInCircle() {
+            if (nodes.length === 0) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const centerX = rect.width / 2;
+            const centerY = rect.height / 2;
+            // 반경을 캔버스 크기에 비례하게 (작은 쪽 기준)
+            const radius = Math.min(rect.width, rect.height) * 0.35;
+            const angleStep = (Math.PI * 2) / nodes.length;
+
+            nodes.forEach((node, index) => {
+                node.x = centerX + radius * Math.cos(angleStep * index - Math.PI / 2); // -PI/2 to start from top
+                node.y = centerY + radius * Math.sin(angleStep * index - Math.PI / 2);
+            });
+
+            draw();
+            statusArea.textContent = '캐릭터를 원형으로 정렬했습니다.';
+        }
+        // --- END NEW FUNCTION ---
+
+        // 관계 추가
+        function handleAddLegend() {
+            const text = legendText.value.trim();
+            const color = legendColor.value;
+            if (!text) {
+                statusArea.textContent = '관계 이름을 입력하세요.';
+                return;
+            }
+
+            const newItem = { text, color };
+            legend.push(newItem);
+            
+            updateLegendDisplay();
+            legendText.value = '';
+            statusArea.textContent = `"${text}" 관계가 추가되었습니다.`;
+        }
+        
+        // 사이드바의 관계 목록 UI 업데이트
+        function updateLegendDisplay() {
+            legendDisplay.innerHTML = ''; // 초기화
+            if (legend.length === 0) {
+                legendDisplay.innerHTML = '<p class="text-sm text-gray-500">정의된 관계가 없습니다.</p>';
+                return;
+            }
+
+            legend.forEach((item, index) => { // --- Added index ---
+                const el = document.createElement('div');
+                // --- MODIFICATION: Added justify-between and delete button ---
+                el.className = 'legend-item p-2 border rounded-md flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors';
+                el.innerHTML = `
+                    <div class="flex items-center overflow-hidden mr-2"> <!-- Wrapper for click area -->
+                        <div class="w-5 h-5 rounded-full mr-3 flex-shrink-0" style="background-color: ${item.color}; border: 1px solid #00000030;"></div>
+                        <span class="font-medium truncate" title="${item.text}">${item.text}</span>
+                    </div>
+                    <button data-index="${index}" class="delete-legend-btn text-gray-400 hover:text-red-500 font-bold px-2 rounded-full flex-shrink-0">&times;</button>
+                `;
+                // --- END MODIFICATION ---
+                
+                // --- MODIFICATION: Changed click listener to wrapper ---
+                el.querySelector('.flex.items-center').addEventListener('click', () => {
+                // --- END MODIFICATION ---
+                    // --- NEW LOGIC START ---
+                    if (selectedLegendEl === el) {
+                        // 이미 선택된 항목을 다시 클릭한 경우: 선택 해제
+                        el.classList.remove('active');
+                        selectedLegendEl = null;
+                        selectedColor = '#000000';
+                        selectedLabel = '';
+                        selection = null; // 노드 선택 초기화
+                        highlightedNodeId = null; // 하이라이트 초기화
+                        statusArea.textContent = '관계 선택이 해제되었습니다. 캐릭터를 클릭하여 관계를 보세요.';
+                        draw();
+                    } else {
+                        // --- END NEW LOGIC ---
+                        // 기존 선택 해제
+                        if (selectedLegendEl) {
+                            selectedLegendEl.classList.remove('active');
+                        }
+                        
+                        // 새 항목 선택
+                        selectedColor = item.color;
+                        selectedLabel = item.text;
+                        selectedLegendEl = el;
+                        el.classList.add('active');
+                        
+                        selection = null; // 관계 종류를 바꾸면 노드 선택 초기화
+                        highlightedNodeId = null; // 
+                        draw();
+                        statusArea.textContent = `"${item.text}" 관계 선택됨. 첫 번째 캐릭터를 선택하세요.`;
+                    } // --- NEW LOGIC: added else block ---
+                });
+                
+                // --- NEW: Delete button listener ---
+                el.querySelector('.delete-legend-btn').addEventListener('click', (e) => {
+                    e.stopPropagation(); // Stop parent click
+                    handleDeleteLegend(index);
+                });
+                // --- END NEW ---
+
+                legendDisplay.appendChild(el);
+            });
+        }
+
+        // 캐릭터 추가
+        function handleAddNode() {
+            const name = nodeNameInput.value.trim();
+            if (!name) {
+                alert('캐릭터 이름을 입력하세요.');
+                return;
+            }
+            
+            const file = nodeImageInput.files[0];
+            const color = nodeColorInput.value;
+            const rect = canvas.getBoundingClientRect();
+
+            const newNode = {
+                id: ++lastNodeId,
+                x: Math.random() * (rect.width - 100) + 50, // 캔버스 내 랜덤 위치
+                y: Math.random() * (rect.height - 100) + 50,
+                radius: 40,
+                name: name,
+                color: color,
+                image: null
+            };
+
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        newNode.image = img;
+                        nodes.push(newNode);
+                        updateCharacterDisplay(); // --- NEW ---
+                        draw();
+                    };
+                    img.onerror = () => {
+                        console.error("Image loading failed.");
+                        nodes.push(newNode); // 이미지 로드 실패 시 단색원으로 추가
+                        updateCharacterDisplay(); // --- NEW ---
+                        draw();
+                    }
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            } else {
+                nodes.push(newNode); // 이미지 없이 단색원으로 추가
+                updateCharacterDisplay(); // --- NEW ---
+                draw();
+            }
+
+            nodeModal.classList.add('hidden');
+            resetNodeModal();
+            statusArea.textContent = `"${name}" 캐릭터가 추가되었습니다.`;
+        }
+        
+        function resetNodeModal() {
+            nodeNameInput.value = '';
+            nodeImageInput.value = ''; // 파일 입력 초기화
+            nodeColorInput.value = '#cbd5e1';
+        }
+
+        // 캔버스 마우스 이벤트
+        function onMouseDown(e) {
+            const { x, y } = getMousePos(e);
+            dragStartX = x;
+            dragStartY = y;
+
+            const clickedNode = findNodeAt(x, y);
+
+            if (clickedNode) {
+                isDragging = true;
+                draggingNode = clickedNode;
+            } else {
+                // 빈 공간 클릭 시 선택 해제
+                if (selection) {
+                    selection = null;
+                    statusArea.textContent = '선택이 취소되었습니다.';
+                }
+                // --- NEW ---
+                if (highlightedNodeId) {
+                    highlightedNodeId = null;
+                    statusArea.textContent = '전체 관계 보기로 돌아갑니다.';
+                }
+                // --- END NEW ---
+                draw();
+            }
+        }
+
+        function onMouseMove(e) {
+            if (!isDragging || !draggingNode) return;
+            
+            const { x, y } = getMousePos(e);
+            draggingNode.x = x;
+            draggingNode.y = y;
+            draw();
+        }
+
+        function onMouseUp(e) {
+            if (!isDragging) return;
+
+            const { x, y } = getMousePos(e);
+            const isClick = Math.abs(x - dragStartX) < 5 && Math.abs(y - dragStartY) < 5;
+
+            if (isDragging && isClick) {
+                // 드래그가 아닌 '클릭'으로 판정
+                if (selectedLabel) {
+                    // 1. Line drawing mode
+                    handleLineDrawClick(draggingNode);
+                } else {
+                    // 2. Highlighting mode
+                    handleHighlightClick(draggingNode);
+                }
+            }
+            
+            isDragging = false;
+            draggingNode = null;
+        }
+        
+        function onMouseOut(e) {
+            // 캔버스 밖으로 나가면 드래그 중지
+            if(isDragging) {
+                isDragging = false;
+                draggingNode = null;
+            }
+        }
+        
+        // 노드 클릭 로직 (관계선 연결)
+        function handleLineDrawClick(clickedNode) {
+            if (!selectedLabel) {
+                statusArea.textContent = '먼저 사이드바에서 관계를 선택하세요.';
+                return;
+            }
+
+            if (selection === null) {
+                // 첫 번째 노드 선택
+                selection = clickedNode.id;
+                statusArea.textContent = `"${clickedNode.name}" 선택됨. 두 번째 캐릭터를 선택하세요.`;
+                draw();
+            } else {
+                // 두 번째 노드 선택
+                if (selection === clickedNode.id) {
+                    // 같은 노드 다시 클릭
+                    selection = null;
+                    statusArea.textContent = '선택이 취소되었습니다.';
+                    draw();
+                } else {
+                    // 두 노드 간에 선 추가
+                    const fromNode = nodes.find(n => n.id === selection);
+                    lines.push({
+                        from: selection,
+                        to: clickedNode.id,
+                        color: selectedColor,
+                        label: selectedLabel
+                    });
+                    
+                    statusArea.textContent = `"${fromNode.name}" → "${clickedNode.name}" (${selectedLabel}) 관계 추가됨.`;
+                    selection = null; // 선택 초기화
+                    draw();
+                }
+            }
+        }
+
+        // --- NEW FUNCTION ---
+        // 사이드바의 캐릭터 목록 UI 업데이트
+        function updateCharacterDisplay() {
+            characterDisplay.innerHTML = ''; // Clear
+            if (nodes.length === 0) {
+                characterDisplay.innerHTML = '<p class="text-sm text-gray-500">추가된 캐릭터가 없습니다.</p>';
+                return;
+            }
+
+            nodes.forEach(node => {
+                const el = document.createElement('div');
+                el.className = 'p-2 border rounded-md flex items-center justify-between hover:bg-gray-100';
+                
+                let imgHtml = '';
+                if (node.image) {
+                    imgHtml = `<img src="${node.image.src}" class="w-8 h-8 rounded-full mr-3 object-cover flex-shrink-0">`;
+                } else {
+                    imgHtml = `<div class="w-8 h-8 rounded-full mr-3 flex-shrink-0" style="background-color: ${node.color}; border: 1px solid #00000030;"></div>`;
+                }
+
+                el.innerHTML = `
+                    <div class="flex items-center overflow-hidden mr-2">
+                        ${imgHtml}
+                        <span class="font-medium truncate" title="${node.name}">${node.name}</span>
+                    </div>
+                    <button data-id="${node.id}" class="delete-node-btn text-gray-400 hover:text-red-500 font-bold px-2 rounded-full flex-shrink-0">&times;</button>
+                `;
+                
+                el.querySelector('.delete-node-btn').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const idToDelete = parseInt(e.currentTarget.dataset.id);
+                    handleDeleteNode(idToDelete);
+                });
+
+                characterDisplay.appendChild(el);
+            });
+        }
+        
+        // --- NEW FUNCTION ---
+        // 캐릭터 삭제 핸들러
+        function handleDeleteNode(idToDelete) {
+            const deletedNode = nodes.find(n => n.id === idToDelete);
+            if (!deletedNode) return;
+            
+            // NOTE: confirm()은 iframe 환경에서 작동하지 않을 수 있으나, 
+            // 이 앱의 컨텍스트에서는 사용자가 확인하는 것이 중요하므로 일단 사용합니다.
+            // (실제 배포 시에는 커스텀 모달로 교체해야 합니다.)
+            if (!confirm(`"${deletedNode.name}" 캐릭터를 삭제하시겠습니까? 연결된 모든 관계선도 함께 삭제됩니다.`)) {
+                return;
+            }
+
+            nodes = nodes.filter(n => n.id !== idToDelete);
+            lines = lines.filter(line => line.from !== idToDelete && line.to !== idToDelete);
+
+            // Check if deleted node was selected
+            if (selection === idToDelete) selection = null;
+            if (highlightedNodeId === idToDelete) highlightedNodeId = null;
+
+            updateCharacterDisplay();
+            draw();
+            statusArea.textContent = `"${deletedNode.name}" 캐릭터를 삭제했습니다.`;
+        }
+        
+        // --- NEW FUNCTION ---
+        // 관계(레전드) 삭제 핸들러
+        function handleDeleteLegend(indexToDelete) {
+            const deletedItem = legend[indexToDelete];
+            if (!deletedItem) return;
+
+            if (!confirm(`"${deletedItem.text}" 관계를 삭제하시겠습니까? 이 관계를 사용하는 모든 선이 삭제됩니다.`)) {
+                return;
+            }
+            
+            legend.splice(indexToDelete, 1);
+            lines = lines.filter(line => !(line.label === deletedItem.text && line.color === deletedItem.color));
+
+            // Reset selection state
+            if (selectedLegendEl) {
+                 selectedLegendEl.classList.remove('active');
+            }
+            selectedLegendEl = null;
+            selectedColor = '#000000';
+            selectedLabel = '';
+            selection = null;
+
+            updateLegendDisplay(); // Rebuilds list
+            draw();
+            statusArea.textContent = `"${deletedItem.text}" 관계를 삭제했습니다.`;
+        }
+
+        // --- END NEW FUNCTIONS ---
+
+        // 기타 유틸리티
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            // CSS 크기 기준의 좌표 반환
+            return {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        }
+
+        function findNodeAt(x, y) {
+            // 역순으로 탐색 (위에 그려진 노드가 먼저 선택됨)
+            for (let i = nodes.length - 1; i >= 0; i--) {
+                const node = nodes[i];
+                const dx = node.x - x;
+                const dy = node.y - y;
+                if (dx * dx + dy * dy < node.radius * node.radius) {
+                    return node;
+                }
+            }
+            return null;
+        }
+
+        // PNG로 저장
+        function exportAsPNG() {
+            // 현재 상태를 다시 그려서 최종 이미지를 만듭니다. (선택 테두리 등 제외)
+            const currentSelection = selection;
+            const currentHighlight = highlightedNodeId; // 
+            selection = null; // 선택 테두리 없이 그리도록
+            highlightedNodeId = null; // 
+            draw();
+            
+            const dataUrl = canvas.toDataURL('image/png');
+            const link = document.createElement('a');
+            link.download = 'character-relationship-map.png';
+            link.href = dataUrl;
+            link.click();
+            
+            // 원래 선택 상태 복원
+            selection = currentSelection;
+            highlightedNodeId = currentHighlight; // 
+            draw();
+            statusArea.textContent = 'PNG 이미지로 저장되었습니다.';
+        }
+
+        // 전체 초기화
+        function clearAll() {
+            if (confirm('정말 모든 작업을 초기화하시겠습니까?')) {
+                nodes = [];
+                lines = [];
+                legend = [...defaultLegend]; // --- MODIFICATION: Reset to default legend ---
+                selection = null;
+                isDragging = false;
+                draggingNode = null;
+                lastNodeId = 0;
+                highlightedNodeId = null; 
+                
+                updateLegendDisplay();
+                updateCharacterDisplay(); // --- NEW ---
+                draw();
+                statusArea.textContent = '모든 내용이 초기화되었습니다.';
+            }
+        }
+
+        // --- 실행 ---
+        initialize();
+
+    </script>
+</body>
+</html>
