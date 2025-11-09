@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>캐릭터 관계도 생성기</title>
-    <!-- Tailwind CSS 로드 -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Inter 폰트 로드 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
@@ -41,7 +39,6 @@
 </head>
 <body class="flex h-screen bg-gray-100 text-gray-800">
 
-    <!-- 모달 (캐릭터 추가용) -->
     <div id="nodeModal" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden items-center justify-center">
         <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
             <h3 class="text-xl font-semibold mb-4">새 캐릭터 추가</h3>
@@ -76,11 +73,9 @@
         </div>
     </div>
 
-    <!-- 사이드바 (컨트롤 패널) -->
     <div id="sidebar" class="w-80 h-full bg-white shadow-lg flex flex-col p-5 overflow-y-auto">
         <h1 class="text-2xl font-bold text-blue-600 mb-6">관계도 생성기</h1>
 
-        <!-- 관계 정의 (Legend) -->
         <div class="mb-6">
             <h2 class="text-lg font-semibold mb-3 border-b pb-2">관계 정의</h2>
             <div class="space-y-3">
@@ -91,25 +86,20 @@
                 </button>
             </div>
             <div id="legendDisplay" class="mt-4 space-y-2">
-                <!-- 동적으로 관계 항목 추가됨 -->
                 <p class="text-sm text-gray-500">정의된 관계가 없습니다.</p>
             </div>
         </div>
 
-        <!-- 캐릭터 추가 -->
         <div class="mb-6">
             <h2 class="text-lg font-semibold mb-3 border-b pb-2">캐릭터</h2>
             <button id="addNodeBtn" class="w-full py-2 px-4 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors">
                 새 캐릭터 추가
             </button>
-            <!-- --- NEW CHARACTER LIST DISPLAY --- -->
             <div id="characterDisplay" class="mt-4 space-y-2">
                 <p class="text-sm text-gray-500">추가된 캐릭터가 없습니다.</p>
             </div>
-            <!-- --- END NEW --- -->
-        </div>
+            </div>
 
-        <!-- 도구 -->
         <div class="mb-6">
             <h2 class="text-lg font-semibold mb-3 border-b pb-2">도구</h2>
             <div class="space-y-3">
@@ -125,7 +115,6 @@
             </div>
         </div>
         
-        <!-- 상태 안내 -->
         <div class="mt-auto pt-4 border-t">
             <h3 class="font-semibold">안내</h3>
             <p id="statusArea" class="text-sm text-gray-600 leading-relaxed">
@@ -135,7 +124,6 @@
         </div>
     </div>
 
-    <!-- 메인 컨텐츠 (캔버스) -->
     <div class="flex-grow p-5 h-full">
         <canvas id="mainCanvas" class="w-full h-full bg-white rounded-lg shadow-inner border border-gray-200">
             캔버스를 지원하지 않는 브라우저입니다.
@@ -180,7 +168,7 @@
             { text: '사이 안 좋음', color: '#E9D5FF' }, // purple-200
             { text: '사이 나쁨 ~ 앙숙', color: '#737373' }  // neutral-500
         ];
-        let legend = [...defaultLegend]; // Initialize with a copy
+        let legend = []; // Will be populated by loadStateFromURL or set to default
         // --- MODIFICATION END ---
 
         // 상호작용 상태
@@ -198,6 +186,15 @@
         // --- 초기화 ---
         function initialize() {
             resizeCanvas();
+            
+            // --- NEW: Load state from URL first ---
+            const loadedFromURL = loadStateFromURL();
+            if (!loadedFromURL) {
+                // If nothing in URL, use defaults
+                legend = [...defaultLegend];
+            }
+            // --- END NEW ---
+
             updateLegendDisplay();
             updateCharacterDisplay(); // --- NEW ---
             draw();
@@ -304,7 +301,7 @@
                 ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
 
                 ctx.save();
-                if (node.image) {
+                if (node.image && node.image.complete) { // --- MODIFICATION: Check if image is loaded ---
                     // 이미지 그리기 (원형으로 클리핑)
                     ctx.clip();
                     try {
@@ -424,6 +421,7 @@
             });
 
             draw();
+            saveStateToURL(); // --- NEW: Save state ---
             statusArea.textContent = '캐릭터를 원형으로 정렬했습니다.';
         }
         // --- END NEW FUNCTION ---
@@ -441,6 +439,7 @@
             legend.push(newItem);
             
             updateLegendDisplay();
+            saveStateToURL(); // --- NEW: Save state ---
             legendText.value = '';
             statusArea.textContent = `"${text}" 관계가 추가되었습니다.`;
         }
@@ -458,8 +457,7 @@
                 // --- MODIFICATION: Added justify-between and delete button ---
                 el.className = 'legend-item p-2 border rounded-md flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors';
                 el.innerHTML = `
-                    <div class="flex items-center overflow-hidden mr-2"> <!-- Wrapper for click area -->
-                        <div class="w-5 h-5 rounded-full mr-3 flex-shrink-0" style="background-color: ${item.color}; border: 1px solid #00000030;"></div>
+                    <div class="flex items-center overflow-hidden mr-2"> <div class="w-5 h-5 rounded-full mr-3 flex-shrink-0" style="background-color: ${item.color}; border: 1px solid #00000030;"></div>
                         <span class="font-medium truncate" title="${item.text}">${item.text}</span>
                     </div>
                     <button data-index="${index}" class="delete-legend-btn text-gray-400 hover:text-red-500 font-bold px-2 rounded-full flex-shrink-0">&times;</button>
@@ -534,29 +532,32 @@
                 image: null
             };
 
+            // --- NEW: Helper function to finalize node addition ---
+            const processNewNode = () => {
+                nodes.push(newNode);
+                updateCharacterDisplay();
+                draw();
+                saveStateToURL(); // Save state after node is added
+            };
+            // --- END NEW ---
+
             if (file) {
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const img = new Image();
                     img.onload = () => {
                         newNode.image = img;
-                        nodes.push(newNode);
-                        updateCharacterDisplay(); // --- NEW ---
-                        draw();
+                        processNewNode(); // --- Use helper ---
                     };
                     img.onerror = () => {
                         console.error("Image loading failed.");
-                        nodes.push(newNode); // 이미지 로드 실패 시 단색원으로 추가
-                        updateCharacterDisplay(); // --- NEW ---
-                        draw();
+                        processNewNode(); // --- Use helper (adds node without image) ---
                     }
                     img.src = e.target.result;
                 };
                 reader.readAsDataURL(file);
             } else {
-                nodes.push(newNode); // 이미지 없이 단색원으로 추가
-                updateCharacterDisplay(); // --- NEW ---
-                draw();
+                processNewNode(); // --- Use helper ---
             }
 
             nodeModal.classList.add('hidden');
@@ -656,6 +657,8 @@
         }
         
         function handleDragEnd(x, y) {
+            const wasDragging = isDragging; // --- NEW: Store state ---
+            
             if (!isDragging) return;
 
             const isClick = Math.abs(x - dragStartX) < 5 && Math.abs(y - dragStartY) < 5;
@@ -673,6 +676,12 @@
             
             isDragging = false;
             draggingNode = null;
+            
+            // --- NEW: Save state if a node was moved (and it wasn't a click) ---
+            if (wasDragging && !isClick) {
+                saveStateToURL();
+            }
+            // --- END NEW ---
         }
 
         // 노드 클릭 로직 (관계선 연결)
@@ -707,6 +716,7 @@
                     statusArea.textContent = `"${fromNode.name}" → "${clickedNode.name}" (${selectedLabel}) 관계 추가됨.`;
                     selection = null; // 선택 초기화
                     draw();
+                    saveStateToURL(); // --- NEW: Save state ---
                 }
             }
         }
@@ -785,6 +795,7 @@
 
             updateCharacterDisplay();
             draw();
+            saveStateToURL(); // --- NEW: Save state ---
             statusArea.textContent = `"${deletedNode.name}" 캐릭터를 삭제했습니다.`;
             // --- END MODIFICATION ---
         }
@@ -813,11 +824,122 @@
 
             updateLegendDisplay(); // Rebuilds list
             draw();
+            saveStateToURL(); // --- NEW: Save state ---
             statusArea.textContent = `"${deletedItem.text}" 관계를 삭제했습니다.`;
             // --- END MODIFICATION ---
         }
 
         // --- END NEW FUNCTIONS ---
+        
+        // --- NEW: URL State Functions ---
+
+        /**
+         * @returns {object} A serializable object representing the app state.
+         */
+        function getSaveableState() {
+            // Convert nodes to a saveable format (store image.src, not the Image object)
+            const saveableNodes = nodes.map(node => ({
+                id: node.id,
+                x: node.x,
+                y: node.y,
+                radius: node.radius,
+                name: node.name,
+                color: node.color,
+                imageSrc: node.image ? node.image.src : null
+            }));
+            
+            return {
+                nodes: saveableNodes,
+                lines: lines,
+                legend: legend
+            };
+        }
+
+        /**
+         * Saves the current app state to the URL hash as Base64.
+         */
+        function saveStateToURL() {
+            try {
+                const state = getSaveableState();
+                const jsonString = JSON.stringify(state);
+                // Use btoa with encodeURIComponent to handle UTF-8 characters
+                const encoded = btoa(unescape(encodeURIComponent(jsonString)));
+                window.location.hash = encoded;
+            } catch (e) {
+                console.error("Failed to save state to URL:", e);
+                statusArea.textContent = '오류: 현재 상태를 URL에 저장하지 못했습니다.';
+            }
+        }
+
+        /**
+         * Loads and restores app state from the URL hash.
+         * @returns {boolean} True if state was loaded, false otherwise.
+         */
+        function loadStateFromURL() {
+            const hash = window.location.hash.substring(1);
+            if (!hash) {
+                return false; // No hash, use defaults
+            }
+
+            try {
+                // Use atob with decodeURIComponent to handle UTF-8 characters
+                const jsonString = decodeURIComponent(escape(atob(hash)));
+                const state = JSON.parse(jsonString);
+
+                if (!state.nodes || !state.lines || !state.legend) {
+                    console.warn("Loaded state is incomplete.");
+                    return false;
+                }
+
+                legend = state.legend;
+                lines = state.lines;
+                nodes = []; // Clear default/empty nodes
+
+                let maxId = 0;
+                
+                // Recreate nodes and their images
+                state.nodes.forEach(savedNode => {
+                    const newNode = {
+                        id: savedNode.id,
+                        x: savedNode.x,
+                        y: savedNode.y,
+                        radius: savedNode.radius,
+                        name: savedNode.name,
+                        color: savedNode.color,
+                        image: null
+                    };
+
+                    if (savedNode.imageSrc) {
+                        const img = new Image();
+                        img.onload = () => {
+                            draw(); // Redraw when image is loaded
+                        };
+                        img.onerror = () => {
+                            console.warn(`Failed to load image for node ${newNode.id}: ${savedNode.imageSrc}`);
+                        };
+                        img.src = savedNode.imageSrc;
+                        newNode.image = img;
+                    }
+
+                    nodes.push(newNode);
+                    if (newNode.id > maxId) {
+                        maxId = newNode.id;
+                    }
+                });
+
+                lastNodeId = maxId; // Set the ID counter
+                
+                statusArea.textContent = 'URL에서 관계도를 불러왔습니다.';
+                return true; // Successfully loaded
+
+            } catch (e) {
+                console.error("Failed to load state from URL:", e);
+                statusArea.textContent = '오류: URL에서 데이터를 불러오지 못했습니다. 기본값으로 시작합니다.';
+                return false; // Loading failed, use defaults
+            }
+        }
+        // --- END NEW URL State Functions ---
+
 
         // 기타 유틸리티
         function getMousePos(e) {
@@ -887,6 +1009,7 @@
                 updateLegendDisplay();
                 updateCharacterDisplay(); // --- NEW ---
                 draw();
+                saveStateToURL(); // --- NEW: Save the empty state ---
                 statusArea.textContent = '모든 내용이 초기화되었습니다.';
             }
             // --- END MODIFICATION ---
