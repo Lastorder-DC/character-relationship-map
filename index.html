@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>캐릭터 관계도 생성기</title>
-    <!-- Tailwind CSS 로드 -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Inter 폰트 로드 -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
@@ -41,7 +39,8 @@
 </head>
 <body class="flex h-screen bg-gray-100 text-gray-800">
 
-    <!-- 모달 (캐릭터 추가용) -->
+    <input type="file" id="importJsonInput" accept="application/json" class="hidden">
+
     <div id="nodeModal" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden items-center justify-center">
         <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-sm">
             <h3 class="text-xl font-semibold mb-4">새 캐릭터 추가</h3>
@@ -76,11 +75,9 @@
         </div>
     </div>
 
-    <!-- 사이드바 (컨트롤 패널) -->
     <div id="sidebar" class="w-80 h-full bg-white shadow-lg flex flex-col p-5 overflow-y-auto">
         <h1 class="text-2xl font-bold text-blue-600 mb-6">관계도 생성기</h1>
 
-        <!-- 관계 정의 (Legend) -->
         <div class="mb-6">
             <h2 class="text-lg font-semibold mb-3 border-b pb-2">관계 정의</h2>
             <div class="space-y-3">
@@ -91,25 +88,20 @@
                 </button>
             </div>
             <div id="legendDisplay" class="mt-4 space-y-2">
-                <!-- 동적으로 관계 항목 추가됨 -->
                 <p class="text-sm text-gray-500">정의된 관계가 없습니다.</p>
             </div>
         </div>
 
-        <!-- 캐릭터 추가 -->
         <div class="mb-6">
             <h2 class="text-lg font-semibold mb-3 border-b pb-2">캐릭터</h2>
             <button id="addNodeBtn" class="w-full py-2 px-4 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors">
                 새 캐릭터 추가
             </button>
-            <!-- --- NEW CHARACTER LIST DISPLAY --- -->
             <div id="characterDisplay" class="mt-4 space-y-2">
                 <p class="text-sm text-gray-500">추가된 캐릭터가 없습니다.</p>
             </div>
-            <!-- --- END NEW --- -->
-        </div>
+            </div>
 
-        <!-- 도구 -->
         <div class="mb-6">
             <h2 class="text-lg font-semibold mb-3 border-b pb-2">도구</h2>
             <div class="space-y-3">
@@ -119,13 +111,18 @@
                 <button id="exportBtn" class="w-full py-2 px-4 bg-indigo-500 text-white rounded-md hover:bg-indigo-600 transition-colors">
                     PNG로 저장
                 </button>
+                <button id="exportJsonBtn" class="w-full py-2 px-4 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors">
+                    JSON으로 내보내기
+                </button>
+                <button id="importJsonBtn" class="w-full py-2 px-4 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors">
+                    JSON에서 가져오기
+                </button>
                 <button id="clearBtn" class="w-full py-2 px-4 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">
                     전체 초기화
                 </button>
             </div>
         </div>
         
-        <!-- 상태 안내 -->
         <div class="mt-auto pt-4 border-t">
             <h3 class="font-semibold">안내</h3>
             <p id="statusArea" class="text-sm text-gray-600 leading-relaxed">
@@ -135,7 +132,6 @@
         </div>
     </div>
 
-    <!-- 메인 컨텐츠 (캔버스) -->
     <div class="flex-grow p-5 h-full">
         <canvas id="mainCanvas" class="w-full h-full bg-white rounded-lg shadow-inner border border-gray-200">
             캔버스를 지원하지 않는 브라우저입니다.
@@ -166,6 +162,12 @@
         const clearBtn = document.getElementById('clearBtn');
         const arrangeCircleBtn = document.getElementById('arrangeCircleBtn'); //
         const statusArea = document.getElementById('statusArea');
+        
+        // --- NEW JSON UI ELEMENTS ---
+        const exportJsonBtn = document.getElementById('exportJsonBtn');
+        const importJsonBtn = document.getElementById('importJsonBtn');
+        const importJsonInput = document.getElementById('importJsonInput');
+        // --- END NEW ---
 
         // 데이터 상태
         let nodes = []; // { id, x, y, radius, name, color, image? }
@@ -396,6 +398,12 @@
             exportBtn.addEventListener('click', exportAsPNG);
             clearBtn.addEventListener('click', clearAll);
             arrangeCircleBtn.addEventListener('click', arrangeInCircle); 
+            
+            // --- NEW JSON LISTENERS ---
+            exportJsonBtn.addEventListener('click', exportAsJSON);
+            importJsonBtn.addEventListener('click', () => importJsonInput.click()); // Trigger hidden input
+            importJsonInput.addEventListener('change', handleImportJSON);
+            // --- END NEW ---
 
             // 모달 버튼
             cancelAddNode.addEventListener('click', () => {
@@ -458,8 +466,7 @@
                 // --- MODIFICATION: Added justify-between and delete button ---
                 el.className = 'legend-item p-2 border rounded-md flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors';
                 el.innerHTML = `
-                    <div class="flex items-center overflow-hidden mr-2"> <!-- Wrapper for click area -->
-                        <div class="w-5 h-5 rounded-full mr-3 flex-shrink-0" style="background-color: ${item.color}; border: 1px solid #00000030;"></div>
+                    <div class="flex items-center overflow-hidden mr-2"> <div class="w-5 h-5 rounded-full mr-3 flex-shrink-0" style="background-color: ${item.color}; border: 1px solid #00000030;"></div>
                         <span class="font-medium truncate" title="${item.text}">${item.text}</span>
                     </div>
                     <button data-index="${index}" class="delete-legend-btn text-gray-400 hover:text-red-500 font-bold px-2 rounded-full flex-shrink-0">&times;</button>
@@ -818,7 +825,7 @@
 
         // --- END NEW FUNCTIONS ---
 
-        // 기타 유틸리티
+        // --- 기타 유틸리티 ---
         function getMousePos(e) {
             const rect = canvas.getBoundingClientRect();
             // CSS 크기 기준의 좌표 반환
@@ -870,6 +877,126 @@
             draw();
             statusArea.textContent = 'PNG 이미지로 저장되었습니다.';
         }
+        
+        // --- NEW: JSON EXPORT FUNCTION ---
+        function exportAsJSON() {
+            // 이미지 객체(Image)를 Data URL(string)로 변환
+            const serializableNodes = nodes.map(node => {
+                const nodeCopy = { ...node };
+                if (node.image) {
+                    nodeCopy.imageSrc = node.image.src; // Store image src (Data URL)
+                }
+                delete nodeCopy.image; // Remove non-serializable Image object
+                return nodeCopy;
+            });
+
+            const data = {
+                nodes: serializableNodes,
+                lines: lines,
+                legend: legend
+            };
+
+            const dataStr = JSON.stringify(data, null, 2); // Pretty-print JSON
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.download = 'character-map-data.json';
+            link.href = url;
+            link.click();
+            
+            URL.revokeObjectURL(url); // Clean up
+            statusArea.textContent = 'JSON 파일로 내보냈습니다.';
+        }
+
+        // --- NEW: JSON IMPORT FUNCTION ---
+        function handleImportJSON(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const data = JSON.parse(event.target.result);
+
+                    // Basic validation
+                    if (!data.nodes || !data.lines || !data.legend) {
+                        alert('잘못된 JSON 파일 형식입니다. (nodes, lines, legend 키가 필요합니다)');
+                        e.target.value = ''; // Reset input
+                        return;
+                    }
+
+                    if (!confirm('현재 작업을 지우고 새 데이터를 가져오시겠습니까?')) {
+                        e.target.value = ''; // Reset input
+                        return;
+                    }
+
+                    // Load data
+                    lines = data.lines;
+                    legend = data.legend;
+                    nodes = [];
+                    lastNodeId = 0;
+
+                    // Re-create nodes and load images asynchronously
+                    const nodePromises = data.nodes.map(nodeData => {
+                        if (nodeData.id > lastNodeId) {
+                            lastNodeId = nodeData.id;
+                        }
+
+                        const newNode = { ...nodeData, image: null };
+                        delete newNode.imageSrc; // This property is handled below
+
+                        if (nodeData.imageSrc) {
+                            // If there's an image, load it
+                            return new Promise((resolve) => {
+                                const img = new Image();
+                                img.onload = () => {
+                                    newNode.image = img;
+                                    resolve(newNode);
+                                };
+                                img.onerror = () => {
+                                    console.warn(`Failed to load image for ${newNode.name} from imported data.`);
+                                    resolve(newNode); // Resolve anyway, just without the image
+                                };
+                                img.src = nodeData.imageSrc;
+                            });
+                        } else {
+                            // No image, just resolve
+                            return Promise.resolve(newNode);
+                        }
+                    });
+
+                    // Wait for all images to load (or fail)
+                    Promise.all(nodePromises).then(loadedNodes => {
+                        nodes = loadedNodes;
+                        
+                        // Reset all UI state
+                        if(selectedLegendEl) selectedLegendEl.classList.remove('active');
+                        selectedLegendEl = null;
+                        selectedColor = '#000000';
+                        selectedLabel = '';
+                        selection = null;
+                        highlightedNodeId = null;
+                        isDragging = false;
+                        draggingNode = null;
+
+                        // Update UI
+                        updateLegendDisplay();
+                        updateCharacterDisplay();
+                        draw();
+                        statusArea.textContent = 'JSON에서 데이터를 성공적으로 가져왔습니다.';
+                    });
+
+                } catch (error) {
+                    alert('파일을 읽는 중 오류가 발생했습니다: ' + error.message);
+                } finally {
+                    e.target.value = ''; // Always reset file input
+                }
+            };
+            reader.readAsText(file);
+        }
+        
+        // --- END NEW JSON FUNCTIONS ---
 
         // 전체 초기화
         function clearAll() {
@@ -883,6 +1010,11 @@
                 lastNodeId = 0;
                 highlightedNodeId = null; 
                 
+                if(selectedLegendEl) selectedLegendEl.classList.remove('active');
+                selectedLegendEl = null;
+                selectedColor = '#000000';
+                selectedLabel = '';
+
                 updateLegendDisplay();
                 updateCharacterDisplay(); // --- NEW ---
                 draw();
