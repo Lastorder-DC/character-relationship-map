@@ -246,7 +246,14 @@
                 // 선 위에 레이블 텍스트 그리기
                 const midX = (fromNode.x + toNode.x) / 2;
                 const midY = (fromNode.y + toNode.y) / 2;
-                const angle = Math.atan2(toNode.y - fromNode.y, toNode.x - fromNode.x);
+                
+                // --- MODIFICATION: Angle correction ---
+                let angle = Math.atan2(toNode.y - fromNode.y, toNode.x - fromNode.x);
+                // 텍스트가 뒤집히지 않도록 각도 보정 (90도 ~ -90도 사이 유지)
+                if (angle > Math.PI / 2 || angle < -Math.PI / 2) {
+                    angle += Math.PI; // 180도 회전
+                }
+                // --- END MODIFICATION ---
 
                 // 텍스트 배경을 위한 사각형
                 const textMetrics = ctx.measureText(line.label);
@@ -255,7 +262,7 @@
 
                 ctx.save();
                 ctx.translate(midX, midY);
-                ctx.rotate(angle);
+                ctx.rotate(angle); // 보정된 각도 사용
                 
                 ctx.fillStyle = 'white'; // 텍스트 배경색
                 ctx.fillRect(-textWidth / 2, -textHeight / 2 - 2, textWidth, textHeight);
@@ -375,6 +382,13 @@
             canvas.addEventListener('mousemove', onMouseMove);
             canvas.addEventListener('mouseup', onMouseUp);
             canvas.addEventListener('mouseout', onMouseOut);
+            
+            // --- NEW: Touch events for mobile ---
+            canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+            canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+            canvas.addEventListener('touchend', onTouchEnd);
+            canvas.addEventListener('touchcancel', onTouchEnd);
+            // --- END NEW ---
 
             // 사이드바 버튼
             addLegendBtn.addEventListener('click', handleAddLegend);
@@ -501,7 +515,8 @@
         function handleAddNode() {
             const name = nodeNameInput.value.trim();
             if (!name) {
-                alert('캐릭터 이름을 입력하세요.');
+                // alert()는 iframe에서 작동하지 않으므로 상태 영역에 표시
+                statusArea.textContent = '캐릭터 이름을 입력하세요.';
                 return;
             }
             
@@ -555,9 +570,60 @@
             nodeColorInput.value = '#cbd5e1';
         }
 
-        // 캔버스 마우스 이벤트
+        // --- 캔버스 마우스/터치 이벤트 ---
+
         function onMouseDown(e) {
             const { x, y } = getMousePos(e);
+            handleDragStart(x, y);
+        }
+
+        function onMouseMove(e) {
+            if (!isDragging) return;
+            const { x, y } = getMousePos(e);
+            handleDragMove(x, y);
+        }
+
+        function onMouseUp(e) {
+            const { x, y } = getMousePos(e);
+            handleDragEnd(x, y);
+        }
+        
+        function onMouseOut(e) {
+            // 캔버스 밖으로 나가면 드래그 중지
+            if(isDragging) {
+                isDragging = false;
+                draggingNode = null;
+            }
+        }
+        
+        function onTouchStart(e) {
+            e.preventDefault();
+            if (e.touches.length === 1) {
+                const { x, y } = getTouchPos(e.touches[0]);
+                handleDragStart(x, y);
+            }
+        }
+        
+        function onTouchMove(e) {
+            e.preventDefault();
+            if (!isDragging) return;
+            if (e.touches.length === 1) {
+                 const { x, y } = getTouchPos(e.touches[0]);
+                handleDragMove(x, y);
+            }
+        }
+
+        function onTouchEnd(e) {
+            // e.changedTouches가 없을 수 있으므로 isDragging으로만 판단
+            if (isDragging) {
+                // 터치 종료 시점의 좌표는 알기 어려우므로, 드래그 중이던 노드의 현재 위치를 사용
+                handleDragEnd(draggingNode.x, draggingNode.y);
+            }
+        }
+
+        // --- 공통 드래그/클릭 로직 ---
+
+        function handleDragStart(x, y) {
             dragStartX = x;
             dragStartY = y;
 
@@ -581,20 +647,17 @@
                 draw();
             }
         }
-
-        function onMouseMove(e) {
-            if (!isDragging || !draggingNode) return;
-            
-            const { x, y } = getMousePos(e);
-            draggingNode.x = x;
-            draggingNode.y = y;
-            draw();
+        
+        function handleDragMove(x, y) {
+             if (!isDragging || !draggingNode) return;
+             draggingNode.x = x;
+             draggingNode.y = y;
+             draw();
         }
-
-        function onMouseUp(e) {
+        
+        function handleDragEnd(x, y) {
             if (!isDragging) return;
 
-            const { x, y } = getMousePos(e);
             const isClick = Math.abs(x - dragStartX) < 5 && Math.abs(y - dragStartY) < 5;
 
             if (isDragging && isClick) {
@@ -611,15 +674,7 @@
             isDragging = false;
             draggingNode = null;
         }
-        
-        function onMouseOut(e) {
-            // 캔버스 밖으로 나가면 드래그 중지
-            if(isDragging) {
-                isDragging = false;
-                draggingNode = null;
-            }
-        }
-        
+
         // 노드 클릭 로직 (관계선 연결)
         function handleLineDrawClick(clickedNode) {
             if (!selectedLabel) {
@@ -655,6 +710,23 @@
                 }
             }
         }
+        
+        // --- NEW FUNCTION ---
+        // 노드 클릭 로직 (관계 하이라이트)
+        function handleHighlightClick(clickedNode) {
+            if (highlightedNodeId === clickedNode.id) {
+                // 이미 하이라이트된 노드를 클릭 -> 하이라이트 해제
+                highlightedNodeId = null;
+                statusArea.textContent = '전체 관계 보기로 돌아갑니다.';
+            } else {
+                // 새 노드 하이라이트
+                highlightedNodeId = clickedNode.id;
+                statusArea.textContent = `"${clickedNode.name}"의 관계를 보는 중... (빈 곳 클릭 시 해제)`;
+            }
+            selection = null; // 라인 그리기 모드 해제
+            draw();
+        }
+        // --- END NEW FUNCTION ---
 
         // --- NEW FUNCTION ---
         // 사이드바의 캐릭터 목록 UI 업데이트
@@ -700,12 +772,11 @@
             const deletedNode = nodes.find(n => n.id === idToDelete);
             if (!deletedNode) return;
             
-            // NOTE: confirm()은 iframe 환경에서 작동하지 않을 수 있으나, 
-            // 이 앱의 컨텍스트에서는 사용자가 확인하는 것이 중요하므로 일단 사용합니다.
-            // (실제 배포 시에는 커스텀 모달로 교체해야 합니다.)
-            if (!confirm(`"${deletedNode.name}" 캐릭터를 삭제하시겠습니까? 연결된 모든 관계선도 함께 삭제됩니다.`)) {
-                return;
-            }
+            // --- MODIFICATION: Removed confirm() ---
+            // confirm()은 iframe 환경에서 작동하지 않으므로 바로 삭제 실행
+            // if (!confirm(`"${deletedNode.name}" 캐릭터를 삭제하시겠습니까? 연결된 모든 관계선도 함께 삭제됩니다.`)) {
+            //     return;
+            // }
 
             nodes = nodes.filter(n => n.id !== idToDelete);
             lines = lines.filter(line => line.from !== idToDelete && line.to !== idToDelete);
@@ -717,6 +788,7 @@
             updateCharacterDisplay();
             draw();
             statusArea.textContent = `"${deletedNode.name}" 캐릭터를 삭제했습니다.`;
+            // --- END MODIFICATION ---
         }
         
         // --- NEW FUNCTION ---
@@ -725,9 +797,11 @@
             const deletedItem = legend[indexToDelete];
             if (!deletedItem) return;
 
-            if (!confirm(`"${deletedItem.text}" 관계를 삭제하시겠습니까? 이 관계를 사용하는 모든 선이 삭제됩니다.`)) {
-                return;
-            }
+            // --- MODIFICATION: Removed confirm() ---
+            // confirm()은 iframe 환경에서 작동하지 않으므로 바로 삭제 실행
+            // if (!confirm(`"${deletedItem.text}" 관계를 삭제하시겠습니까? 이 관계를 사용하는 모든 선이 삭제됩니다.`)) {
+            //     return;
+            // }
             
             legend.splice(indexToDelete, 1);
             lines = lines.filter(line => !(line.label === deletedItem.text && line.color === deletedItem.color));
@@ -744,6 +818,7 @@
             updateLegendDisplay(); // Rebuilds list
             draw();
             statusArea.textContent = `"${deletedItem.text}" 관계를 삭제했습니다.`;
+            // --- END MODIFICATION ---
         }
 
         // --- END NEW FUNCTIONS ---
@@ -751,11 +826,18 @@
         // 기타 유틸리티
         function getMousePos(e) {
             const rect = canvas.getBoundingClientRect();
-            const dpr = window.devicePixelRatio || 1;
             // CSS 크기 기준의 좌표 반환
             return {
                 x: e.clientX - rect.left,
                 y: e.clientY - rect.top
+            };
+        }
+        
+        function getTouchPos(touch) {
+             const rect = canvas.getBoundingClientRect();
+             return {
+                x: touch.clientX - rect.left,
+                y: touch.clientY - rect.top
             };
         }
 
@@ -796,7 +878,9 @@
 
         // 전체 초기화
         function clearAll() {
-            if (confirm('정말 모든 작업을 초기화하시겠습니까?')) {
+            // --- MODIFICATION: Removed confirm() ---
+            // confirm()은 iframe 환경에서 작동하지 않으므로 바로 실행
+            // if (confirm('정말 모든 작업을 초기화하시겠습니까?')) {
                 nodes = [];
                 lines = [];
                 legend = [...defaultLegend]; // --- MODIFICATION: Reset to default legend ---
@@ -810,7 +894,8 @@
                 updateCharacterDisplay(); // --- NEW ---
                 draw();
                 statusArea.textContent = '모든 내용이 초기화되었습니다.';
-            }
+            // }
+            // --- END MODIFICATION ---
         }
 
         // --- 실행 ---
